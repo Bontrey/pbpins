@@ -10,9 +10,11 @@ import SwiftData
 
 @main
 struct PBPinsApp: App {
+    @State private var authManager = AuthManager()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Bookmark.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -26,6 +28,7 @@ struct PBPinsApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(authManager)
         }
         .modelContainer(sharedModelContainer)
     }
