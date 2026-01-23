@@ -57,6 +57,51 @@ class PinboardAPI {
         self.apiToken = apiToken
     }
 
+    func updateBookmark(
+        url: String,
+        title: String,
+        description: String = "",
+        tags: [String] = [],
+        isPrivate: Bool = false,
+        isUnread: Bool = false
+    ) async throws {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/posts/add") else {
+            throw PinboardError.invalidURL
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "auth_token", value: apiToken),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "url", value: url),
+            URLQueryItem(name: "description", value: title),
+            URLQueryItem(name: "extended", value: description),
+            URLQueryItem(name: "tags", value: tags.joined(separator: " ")),
+            URLQueryItem(name: "shared", value: isPrivate ? "no" : "yes"),
+            URLQueryItem(name: "toread", value: isUnread ? "yes" : "no"),
+            URLQueryItem(name: "replace", value: "yes")
+        ]
+
+        guard let url = urlComponents.url else {
+            throw PinboardError.invalidURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PinboardError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw PinboardError.httpError(httpResponse.statusCode)
+        }
+
+        // Check for API error in response
+        if let responseString = String(data: data, encoding: .utf8),
+           responseString.contains("\"result_code\":\"done\"") == false {
+            throw PinboardError.invalidResponse
+        }
+    }
+
     func fetchRecentBookmarks(count: Int = 100) async throws -> [APIBookmark] {
         guard var urlComponents = URLComponents(string: "\(baseURL)/posts/recent") else {
             throw PinboardError.invalidURL

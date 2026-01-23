@@ -22,6 +22,7 @@ struct BookmarkListView: View {
     @State private var errorMessage: String?
     @State private var showingSettings = false
     @State private var selectedFilter: BookmarkFilter = .all
+    @State private var isUpdating = false
 
     private var filteredBookmarks: [Bookmark] {
         switch selectedFilter {
@@ -48,7 +49,19 @@ struct BookmarkListView: View {
                         } label: {
                             BookmarkRowView(bookmark: bookmark)
                         }
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                Task { await toggleReadStatus(bookmark) }
+                            } label: {
+                                Label(
+                                    bookmark.isUnread ? "Mark Read" : "Mark Unread",
+                                    systemImage: bookmark.isUnread ? "checkmark.circle" : "circle"
+                                )
+                            }
+                            .tint(bookmark.isUnread ? .green : .blue)
+                        }
                     }
+                    .disabled(isUpdating)
                 }
             }
             .safeAreaInset(edge: .top) {
@@ -130,6 +143,34 @@ struct BookmarkListView: View {
         }
     }
 
+    private func toggleReadStatus(_ bookmark: Bookmark) async {
+        guard let api = authManager.createAPI() else { return }
+
+        isUpdating = true
+        let newUnreadStatus = !bookmark.isUnread
+
+        do {
+            try await api.updateBookmark(
+                url: bookmark.url,
+                title: bookmark.title,
+                description: bookmark.desc,
+                tags: bookmark.tags,
+                isPrivate: bookmark.isPrivate,
+                isUnread: newUnreadStatus
+            )
+            await MainActor.run {
+                bookmark.isUnread = newUnreadStatus
+                bookmark.updated = Date()
+                isUpdating = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isUpdating = false
+            }
+        }
+    }
+
     private func syncBookmarks(_ apiBookmarks: [APIBookmark]) {
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime]
@@ -206,39 +247,114 @@ struct BookmarkRowView: View {
 }
 
 struct BookmarkDetailView: View {
-    let bookmark: Bookmark
+    @Environment(AuthManager.self) private var authManager
+    @Bindable var bookmark: Bookmark
+
+    @State private var title: String = ""
+    @State private var url: String = ""
+    @State private var tagsText: String = ""
+    @State private var isUnread: Bool = false
+    @State private var isPrivate: Bool = false
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var hasChanges: Bool {
+        title != bookmark.title ||
+        url != bookmark.url ||
+        tagsText != bookmark.tags.joined(separator: " ") ||
+        isUnread != bookmark.isUnread ||
+        isPrivate != bookmark.isPrivate
+    }
 
     var body: some View {
         Form {
             Section("Title") {
-                Text(bookmark.title.isEmpty ? "(No title)" : bookmark.title)
+                TextField("Title", text: $title)
             }
 
             Section("URL") {
-                Text(bookmark.url)
-                    .textSelection(.enabled)
+                TextField("URL", text: $url)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
             }
 
-            if !bookmark.desc.isEmpty {
-                Section("Description") {
-                    Text(bookmark.desc)
-                }
+            Section("Tags") {
+                TextField("Tags (space-separated)", text: $tagsText)
+                    .textInputAutocapitalization(.never)
             }
 
-            if !bookmark.tags.isEmpty {
-                Section("Tags") {
-                    Text(bookmark.tags.joined(separator: ", "))
-                }
+            Section {
+                Toggle("Unread", isOn: $isUnread)
+                Toggle("Private", isOn: $isPrivate)
             }
 
             Section("Info") {
                 LabeledContent("Created", value: bookmark.created, format: .dateTime)
                 LabeledContent("Updated", value: bookmark.updated, format: .dateTime)
-                LabeledContent("Private", value: bookmark.isPrivate ? "Yes" : "No")
-                LabeledContent("Unread", value: bookmark.isUnread ? "Yes" : "No")
             }
         }
         .navigationTitle("Bookmark")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if isSaving {
+                    ProgressView()
+                } else {
+                    Button("Save") {
+                        Task { await saveChanges() }
+                    }
+                    .disabled(!hasChanges || title.isEmpty || url.isEmpty)
+                }
+            }
+        }
+        .alert("Error", isPresented: .init(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let errorMessage {
+                Text(errorMessage)
+            }
+        }
+        .onAppear {
+            title = bookmark.title
+            url = bookmark.url
+            tagsText = bookmark.tags.joined(separator: " ")
+            isUnread = bookmark.isUnread
+            isPrivate = bookmark.isPrivate
+        }
+    }
+
+    private func saveChanges() async {
+        guard let api = authManager.createAPI() else { return }
+
+        isSaving = true
+        let tags = tagsText.isEmpty ? [] : tagsText.split(separator: " ").map(String.init)
+
+        do {
+            try await api.updateBookmark(
+                url: url,
+                title: title,
+                description: bookmark.desc,
+                tags: tags,
+                isPrivate: isPrivate,
+                isUnread: isUnread
+            )
+            await MainActor.run {
+                bookmark.title = title
+                bookmark.url = url
+                bookmark.tags = tags
+                bookmark.isUnread = isUnread
+                bookmark.isPrivate = isPrivate
+                bookmark.updated = Date()
+                isSaving = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isSaving = false
+            }
+        }
     }
 }
 
