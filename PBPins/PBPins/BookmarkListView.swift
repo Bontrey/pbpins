@@ -17,6 +17,7 @@ enum BookmarkFilter: String, CaseIterable {
 struct BookmarkListView: View {
     @Environment(AuthManager.self) private var authManager
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \Bookmark.created, order: .reverse) private var bookmarks: [Bookmark]
 
     @State private var isLoading = false
@@ -149,6 +150,16 @@ struct BookmarkListView: View {
             .task {
                 if bookmarks.isEmpty {
                     await refreshBookmarks()
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    // Only refresh if a bookmark was saved via share extension
+                    if let groupDefaults = UserDefaults(suiteName: "group.ch.longwei.PBPins"),
+                       groupDefaults.bool(forKey: "needs_refresh") {
+                        groupDefaults.set(false, forKey: "needs_refresh")
+                        Task { await refreshBookmarks() }
+                    }
                 }
             }
         } detail: {

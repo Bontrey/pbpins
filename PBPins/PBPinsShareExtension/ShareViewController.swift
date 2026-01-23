@@ -281,6 +281,11 @@ struct ShareExtensionView: View {
                     isUnread: isUnread
                 )
 
+                // Signal to main app that a bookmark was saved
+                if let groupDefaults = UserDefaults(suiteName: "group.ch.longwei.PBPins") {
+                    groupDefaults.set(true, forKey: "needs_refresh")
+                }
+
                 await MainActor.run {
                     extensionContext?.completeRequest(returningItems: nil)
                 }
