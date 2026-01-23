@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import SafariServices
 
 enum BookmarkFilter: String, CaseIterable {
     case all = "All"
@@ -49,6 +50,25 @@ struct BookmarkListView: View {
                             BookmarkDetailView(bookmark: bookmark)
                         } label: {
                             BookmarkRowView(bookmark: bookmark)
+                        }
+                        .contextMenu {
+                            if let url = URL(string: bookmark.url) {
+                                Link(destination: url) {
+                                    Label("Open in Safari", systemImage: "safari")
+                                }
+                            }
+                            Button {
+                                Task { await toggleReadStatus(bookmark) }
+                            } label: {
+                                Label(
+                                    bookmark.isUnread ? "Mark as Read" : "Mark as Unread",
+                                    systemImage: bookmark.isUnread ? "checkmark.circle" : "circle"
+                                )
+                            }
+                        } preview: {
+                            if let url = URL(string: bookmark.url) {
+                                SafariPreview(url: url)
+                            }
                         }
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             Button {
@@ -261,6 +281,16 @@ struct BookmarkListView: View {
     }
 }
 
+struct SafariPreview: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+}
+
 struct BookmarkRowView: View {
     let bookmark: Bookmark
 
@@ -327,9 +357,18 @@ struct BookmarkDetailView: View {
             }
 
             Section("URL") {
-                TextField("URL", text: $url)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
+                HStack {
+                    TextField("URL", text: $url)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+
+                    if let validURL = URL(string: url) {
+                        Link(destination: validURL) {
+                            Image(systemName: "safari")
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                }
             }
 
             Section("Tags") {
