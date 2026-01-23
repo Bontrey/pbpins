@@ -21,6 +21,8 @@ struct TagBookmarksView: View {
     @State private var currentOffset = 0
     @State private var hasMorePages = true
     @State private var selectedBookmark: APIBookmark?
+    @State private var isUpdating = false
+    @State private var bookmarkToDelete: APIBookmark?
 
     private let pageSize = 100
 
@@ -39,10 +41,36 @@ struct TagBookmarksView: View {
                             Label("Open in Safari", systemImage: "safari")
                         }
                     }
+                    Button {
+                        Task { await toggleReadStatus(bookmark) }
+                    } label: {
+                        Label(
+                            bookmark.toread == "yes" ? "Mark as Read" : "Mark as Unread",
+                            systemImage: bookmark.toread == "yes" ? "checkmark.circle" : "circle"
+                        )
+                    }
                 } preview: {
                     if let url = URL(string: bookmark.href) {
                         SafariPreview(url: url)
                     }
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    Button {
+                        Task { await toggleReadStatus(bookmark) }
+                    } label: {
+                        Label(
+                            bookmark.toread == "yes" ? "Mark Read" : "Mark Unread",
+                            systemImage: bookmark.toread == "yes" ? "checkmark.circle" : "circle"
+                        )
+                    }
+                    .tint(bookmark.toread == "yes" ? .green : .blue)
+
+                    Button {
+                        bookmarkToDelete = bookmark
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .tint(.red)
                 }
             }
 
@@ -58,6 +86,7 @@ struct TagBookmarksView: View {
                 }
             }
         }
+        .disabled(isUpdating)
         .sheet(item: $selectedBookmark) { bookmark in
             NavigationStack {
                 TagBookmarkDetailView(bookmark: bookmark)
@@ -113,6 +142,21 @@ struct TagBookmarksView: View {
                 Text(errorMessage)
             }
         }
+        .confirmationDialog("Delete Bookmark", isPresented: .init(
+            get: { bookmarkToDelete != nil },
+            set: { if !$0 { bookmarkToDelete = nil } }
+        ), titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let bookmark = bookmarkToDelete {
+                    Task { await deleteBookmark(bookmark) }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                bookmarkToDelete = nil
+            }
+        } message: {
+            Text("Are you sure you want to delete this bookmark? This cannot be undone.")
+        }
     }
 
     private func refreshBookmarks() async {
@@ -156,6 +200,58 @@ struct TagBookmarksView: View {
             await MainActor.run {
                 errorMessage = error.localizedDescription
                 isLoadingMore = false
+            }
+        }
+    }
+
+    private func toggleReadStatus(_ bookmark: APIBookmark) async {
+        guard let api = authManager.createAPI() else { return }
+
+        isUpdating = true
+        let newUnreadStatus = bookmark.toread != "yes"
+        let tags = bookmark.tags.isEmpty ? [] : bookmark.tags.split(separator: " ").map(String.init)
+
+        do {
+            try await api.updateBookmark(
+                url: bookmark.href,
+                title: bookmark.description,
+                description: bookmark.extended,
+                tags: tags,
+                isPrivate: bookmark.shared == "no",
+                isUnread: newUnreadStatus
+            )
+            await MainActor.run {
+                // Update the local bookmark in the array
+                if let index = bookmarks.firstIndex(where: { $0.hash == bookmark.hash }) {
+                    var updatedBookmark = bookmarks[index]
+                    updatedBookmark.toread = newUnreadStatus ? "yes" : "no"
+                    bookmarks[index] = updatedBookmark
+                }
+                isUpdating = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isUpdating = false
+            }
+        }
+    }
+
+    private func deleteBookmark(_ bookmark: APIBookmark) async {
+        guard let api = authManager.createAPI() else { return }
+
+        isUpdating = true
+
+        do {
+            try await api.deleteBookmark(url: bookmark.href)
+            await MainActor.run {
+                bookmarks.removeAll { $0.hash == bookmark.hash }
+                isUpdating = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isUpdating = false
             }
         }
     }

@@ -21,7 +21,7 @@ struct APIBookmark: Codable, Identifiable {
     let hash: String
     let time: String
     let shared: String
-    let toread: String
+    var toread: String
     let tags: String
 
     var id: String { hash }
