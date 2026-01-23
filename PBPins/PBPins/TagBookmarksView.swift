@@ -92,8 +92,10 @@ struct TagBookmarksView: View {
                 TagBookmarkDetailView(bookmark: bookmark)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") {
+                            Button {
                                 selectedBookmark = nil
+                            } label: {
+                                Image(systemName: "xmark")
                             }
                         }
                     }
