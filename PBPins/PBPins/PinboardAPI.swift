@@ -13,7 +13,7 @@ struct PostsResponse: Codable {
     let posts: [APIBookmark]
 }
 
-struct APIBookmark: Codable {
+struct APIBookmark: Codable, Identifiable {
     let href: String
     let description: String
     let extended: String
@@ -23,6 +23,8 @@ struct APIBookmark: Codable {
     let shared: String
     let toread: String
     let tags: String
+
+    var id: String { hash }
 }
 
 enum PinboardError: Error, LocalizedError {
@@ -167,17 +169,23 @@ class PinboardAPI {
         }
     }
 
-    func fetchAllBookmarks(start: Int = 0, results: Int = 100) async throws -> [APIBookmark] {
+    func fetchAllBookmarks(start: Int = 0, results: Int = 100, tag: String? = nil) async throws -> [APIBookmark] {
         guard var urlComponents = URLComponents(string: "\(baseURL)/posts/all") else {
             throw PinboardError.invalidURL
         }
 
-        urlComponents.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "auth_token", value: apiToken),
             URLQueryItem(name: "format", value: "json"),
             URLQueryItem(name: "start", value: String(start)),
             URLQueryItem(name: "results", value: String(results))
         ]
+
+        if let tag = tag {
+            queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+
+        urlComponents.queryItems = queryItems
 
         guard let url = urlComponents.url else {
             throw PinboardError.invalidURL

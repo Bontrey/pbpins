@@ -66,20 +66,22 @@ struct BookmarkListView: View {
                             Text("Your bookmarks don't have any tags yet.")
                         }
                     } else {
-                        List {
-                            ForEach(tags) { tag in
-                                Button {
-                                    // TODO: Implement tag filtering
-                                } label: {
-                                    HStack {
-                                        Label(tag.name, systemImage: "tag")
-                                        Spacer()
-                                        Text("\(tag.count)")
-                                            .foregroundStyle(.secondary)
+                        NavigationStack {
+                            List {
+                                ForEach(tags) { tag in
+                                    NavigationLink {
+                                        TagBookmarksView(tag: tag)
+                                    } label: {
+                                        HStack {
+                                            Label(tag.name, systemImage: "tag")
+                                            Spacer()
+                                            Text("\(tag.count)")
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
-                                .foregroundStyle(.primary)
                             }
+                            .navigationTitle("Tags")
                         }
                     }
                 } else if filteredBookmarks.isEmpty && !isLoading {
