@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PBPins is a native iOS Pinboard client for iPad, built with Swift 5 and SwiftUI. It uses SwiftData for persistence and includes a share extension for saving bookmarks from other apps.
 
+## External Resources
+
+- **Pinboard API Documentation**: https://pinboard.in/api
+
 ## Build Commands
 
 Build from command line:
@@ -26,13 +30,34 @@ open PBPins/PBPins.xcodeproj
 ## Architecture
 
 ### Main App (`PBPins/PBPins/`)
-- **PBPinsApp.swift**: App entry point, configures SwiftData ModelContainer
-- **ContentView.swift**: Root view using NavigationSplitView (master-detail layout)
-- **Item.swift**: SwiftData model (currently a template, will be replaced with Pinboard bookmark model)
+
+**Core Infrastructure:**
+- **PBPinsApp.swift**: App entry point, configures SwiftData ModelContainer and AuthManager environment
+- **ContentView.swift**: Root view that routes to LoginView or BookmarkListView based on auth state
+
+**Authentication:**
+- **AuthManager.swift**: Observable class managing Pinboard API token storage (UserDefaults), login state, and PinboardAPI factory method
+
+**API Integration:**
+- **PinboardAPI.swift**: Pinboard API client using async/await
+  - Base URL: `https://api.pinboard.in/v1`
+  - Currently implements `fetchRecentBookmarks(count:)` via `/posts/recent`
+  - Defines `APIBookmark` and `PostsResponse` Codable structs for response parsing
+  - Custom `PinboardError` enum with localized error descriptions
+
+**Data Model:**
+- **Bookmark.swift**: SwiftData @Model for persisting bookmarks locally
+  - Properties: id (hash), url, title, desc, tags (array), created, updated, isPrivate
+
+**Views:**
+- **LoginView.swift**: API token input form with validation and test API call
+- **BookmarkListView.swift**: NavigationSplitView with master-detail layout (iPad-optimized)
+  - Includes nested `BookmarkRowView` and `BookmarkDetailView`
+  - Handles bookmark sync from API to SwiftData
+- **SettingsView.swift**: Account info display and logout functionality
 
 ### Share Extension (`PBPins/PBPinsShareExtension/`)
-- **ShareViewController.swift**: UIKit-based SLComposeServiceViewController for iOS share sheet integration
-- Allows saving URLs to Pinboard from Safari and other apps
+- **ShareViewController.swift**: UIKit-based SLComposeServiceViewController (template, not yet functional)
 
 ### Key Frameworks
 - **SwiftUI**: Declarative UI for the main app
@@ -40,9 +65,10 @@ open PBPins/PBPins.xcodeproj
 - **UIKit + Social**: Share extension (extensions require UIKit)
 
 ### Data Flow
-- SwiftData `ModelContainer` is configured in PBPinsApp and injected via `.modelContainer()` modifier
-- Views access data via `@Environment(\.modelContext)` and `@Query` property wrappers
-- Model mutations use `modelContext.insert()` and `modelContext.delete()`
+1. **Authentication**: User enters API token → LoginView validates via test API call → AuthManager stores in UserDefaults
+2. **Bookmark Sync**: BookmarkListView triggers refresh → AuthManager creates PinboardAPI instance → Fetches from API → Syncs to SwiftData
+3. **Display**: @Query fetches bookmarks from SwiftData → NavigationSplitView renders list/detail
+4. **Logout**: SettingsView deletes all Bookmark records → AuthManager clears token → Routes to LoginView
 
 ## Configuration
 
