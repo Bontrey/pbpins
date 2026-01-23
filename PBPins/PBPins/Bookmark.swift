@@ -18,8 +18,9 @@ final class Bookmark {
     var created: Date
     var updated: Date
     var isPrivate: Bool
+    var isUnread: Bool = false
 
-    init(id: String, url: String, title: String, desc: String, tags: [String], created: Date, updated: Date, isPrivate: Bool) {
+    init(id: String, url: String, title: String, desc: String, tags: [String], created: Date, updated: Date, isPrivate: Bool, isUnread: Bool = false) {
         self.id = id
         self.url = url
         self.title = title
@@ -28,5 +29,6 @@ final class Bookmark {
         self.created = created
         self.updated = updated
         self.isPrivate = isPrivate
+        self.isUnread = isUnread
     }
 }

@@ -114,6 +114,7 @@ struct BookmarkListView: View {
             let created = dateFormatter.date(from: apiBookmark.time) ?? Date()
             let tags = apiBookmark.tags.isEmpty ? [] : apiBookmark.tags.split(separator: " ").map(String.init)
             let isPrivate = apiBookmark.shared == "no"
+            let isUnread = apiBookmark.toread == "yes"
 
             if existingIDs.contains(apiBookmark.hash) {
                 if let existing = bookmarks.first(where: { $0.id == apiBookmark.hash }) {
@@ -123,6 +124,7 @@ struct BookmarkListView: View {
                     existing.tags = tags
                     existing.updated = created
                     existing.isPrivate = isPrivate
+                    existing.isUnread = isUnread
                 }
             } else {
                 let bookmark = Bookmark(
@@ -133,7 +135,8 @@ struct BookmarkListView: View {
                     tags: tags,
                     created: created,
                     updated: created,
-                    isPrivate: isPrivate
+                    isPrivate: isPrivate,
+                    isUnread: isUnread
                 )
                 modelContext.insert(bookmark)
             }
@@ -145,21 +148,31 @@ struct BookmarkRowView: View {
     let bookmark: Bookmark
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(bookmark.title.isEmpty ? bookmark.url : bookmark.title)
-                .font(.headline)
-                .lineLimit(1)
+        HStack(alignment: .top, spacing: 8) {
+            if bookmark.isUnread {
+                Circle()
+                    .fill(.blue)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 6)
+            }
 
-            Text(bookmark.url)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            if !bookmark.tags.isEmpty {
-                Text(bookmark.tags.joined(separator: ", "))
-                    .font(.caption2)
-                    .foregroundStyle(.blue)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(bookmark.title.isEmpty ? bookmark.url : bookmark.title)
+                    .font(.headline)
+                    .fontWeight(bookmark.isUnread ? .semibold : .regular)
                     .lineLimit(1)
+
+                Text(bookmark.url)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                if !bookmark.tags.isEmpty {
+                    Text(bookmark.tags.joined(separator: ", "))
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 2)
@@ -196,6 +209,7 @@ struct BookmarkDetailView: View {
                 LabeledContent("Created", value: bookmark.created, format: .dateTime)
                 LabeledContent("Updated", value: bookmark.updated, format: .dateTime)
                 LabeledContent("Private", value: bookmark.isPrivate ? "Yes" : "No")
+                LabeledContent("Unread", value: bookmark.isUnread ? "Yes" : "No")
             }
         }
         .navigationTitle("Bookmark")
