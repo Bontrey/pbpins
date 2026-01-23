@@ -289,11 +289,14 @@ struct BookmarkListView: View {
         let oldestDate = apiDates.min()
         let newestDate = apiDates.max()
 
-        // Delete local bookmarks that fall within the fetched date range but aren't in API response
+        // Delete local bookmarks that aren't in the API response
         if let oldest = oldestDate, let newest = newestDate {
             for bookmark in bookmarks {
+                // On full refresh (first page), also delete bookmarks newer than the newest API result
+                // since those must have been deleted from Pinboard
+                let isNewerThanFetched = isFullRefresh && bookmark.created > newest
                 let isInDateRange = bookmark.created >= oldest && bookmark.created <= newest
-                if isInDateRange && !apiIDs.contains(bookmark.id) {
+                if (isInDateRange || isNewerThanFetched) && !apiIDs.contains(bookmark.id) {
                     modelContext.delete(bookmark)
                 }
             }
