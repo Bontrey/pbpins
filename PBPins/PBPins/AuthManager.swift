@@ -11,10 +11,13 @@ import SwiftUI
 @Observable
 class AuthManager {
     private let apiTokenKey = "pinboard_api_token"
+    private let appGroupID = "group.ch.longwei.PBPins"
 
     var apiToken: String {
         didSet {
+            // Store in both standard and App Group UserDefaults for share extension access
             UserDefaults.standard.set(apiToken, forKey: apiTokenKey)
+            UserDefaults(suiteName: appGroupID)?.set(apiToken, forKey: apiTokenKey)
         }
     }
 
@@ -28,7 +31,14 @@ class AuthManager {
     }
 
     init() {
-        self.apiToken = UserDefaults.standard.string(forKey: apiTokenKey) ?? ""
+        // Try App Group first, then fall back to standard UserDefaults
+        if let groupDefaults = UserDefaults(suiteName: appGroupID),
+           let token = groupDefaults.string(forKey: apiTokenKey),
+           !token.isEmpty {
+            self.apiToken = token
+        } else {
+            self.apiToken = UserDefaults.standard.string(forKey: apiTokenKey) ?? ""
+        }
     }
 
     func login(apiToken: String) {
@@ -37,6 +47,7 @@ class AuthManager {
 
     func logout() {
         UserDefaults.standard.removeObject(forKey: apiTokenKey)
+        UserDefaults(suiteName: appGroupID)?.removeObject(forKey: apiTokenKey)
         self.apiToken = ""
     }
 
