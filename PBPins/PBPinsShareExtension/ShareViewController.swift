@@ -253,6 +253,10 @@ struct ShareExtensionView: View {
                     .replacingOccurrences(of: "&quot;", with: "\"")
                     .replacingOccurrences(of: "&#39;", with: "'")
                     .replacingOccurrences(of: "&nbsp;", with: " ")
+                    .replacingOccurrences(of: "&ndash;", with: "–")
+                    .replacingOccurrences(of: "&#8211;", with: "–")
+                    .replacingOccurrences(of: "&mdash;", with: "—")
+                    .replacingOccurrences(of: "&#8212;", with: "—")
 
                 if !title.isEmpty {
                     return title

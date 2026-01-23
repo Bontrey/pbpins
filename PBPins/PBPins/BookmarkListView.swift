@@ -527,6 +527,7 @@ struct BookmarkDetailView: View {
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
     @State private var errorMessage: String?
+    @State private var isFetchingTitle = false
 
     private var hasChanges: Bool {
         title != bookmark.title ||
@@ -540,6 +541,20 @@ struct BookmarkDetailView: View {
         Form {
             Section("Title") {
                 TextField("Title", text: $title)
+                Button {
+                    Task { await fetchTitleFromURL() }
+                } label: {
+                    HStack {
+                        if isFetchingTitle {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Fetching title...")
+                        } else {
+                            Text("Fetch title from URL")
+                        }
+                    }
+                }
+                .disabled(isFetchingTitle || url.isEmpty)
             }
 
             Section("URL") {
@@ -656,6 +671,21 @@ struct BookmarkDetailView: View {
                 errorMessage = error.localizedDescription
                 isDeleting = false
             }
+        }
+    }
+
+    private func fetchTitleFromURL() async {
+        guard let targetURL = URL(string: url) else { return }
+
+        isFetchingTitle = true
+        defer { isFetchingTitle = false }
+
+        do {
+            if let extractedTitle = try await TitleFetcher.fetchTitle(from: targetURL) {
+                self.title = extractedTitle
+            }
+        } catch {
+            errorMessage = "Failed to fetch title: \(error.localizedDescription)"
         }
     }
 
