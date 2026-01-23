@@ -24,7 +24,7 @@ struct LoginView: View {
                 } header: {
                     Text("Pinboard Credentials")
                 } footer: {
-                    Text("Enter your API token from pinboard.in/settings/password (format: username:TOKEN)")
+                    Text("Enter your API token from pinboard.in/settings/password")
                 }
 
                 if let errorMessage {
