@@ -14,12 +14,21 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingLogoutConfirmation = false
+    @State private var showingDeleteDataConfirmation = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Account") {
                     LabeledContent("Username", value: authManager.username)
+                }
+
+                Section {
+                    Button("Delete All Local Data", role: .destructive) {
+                        showingDeleteDataConfirmation = true
+                    }
+                } footer: {
+                    Text("Deletes all cached bookmarks and tags. Data will be re-fetched from Pinboard.")
                 }
 
                 Section {
@@ -46,14 +55,33 @@ struct SettingsView: View {
             } message: {
                 Text("Are you sure you want to log out? All local bookmarks will be deleted.")
             }
+            .alert("Delete All Local Data", isPresented: $showingDeleteDataConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    deleteAllData()
+                }
+            } message: {
+                Text("This will delete all cached bookmarks and tags. Your data on Pinboard will not be affected.")
+            }
         }
+    }
+
+    private func deleteAllData() {
+        do {
+            try modelContext.delete(model: Bookmark.self)
+            try modelContext.delete(model: Tag.self)
+        } catch {
+            print("Failed to delete data: \(error)")
+        }
+        dismiss()
     }
 
     private func logout() {
         do {
             try modelContext.delete(model: Bookmark.self)
+            try modelContext.delete(model: Tag.self)
         } catch {
-            print("Failed to delete bookmarks: \(error)")
+            print("Failed to delete data: \(error)")
         }
         authManager.logout()
         dismiss()
