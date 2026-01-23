@@ -31,7 +31,7 @@ struct BookmarkListView: View {
     @State private var currentOffset = 0
     @State private var hasMorePages = true
     @State private var selectedBookmarkID: String?
-    @State private var accountTags: [(tag: String, count: Int)] = []
+    @Query(sort: \Tag.count, order: .reverse) private var tags: [Tag]
     @State private var isLoadingTags = false
 
     private let pageSize = 100
@@ -58,7 +58,8 @@ struct BookmarkListView: View {
                 if selectedFilter == .tags {
                     if isLoadingTags {
                         ProgressView("Loading tags...")
-                    } else if accountTags.isEmpty {
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if tags.isEmpty {
                         ContentUnavailableView {
                             Label("No Tags", systemImage: "tag")
                         } description: {
@@ -66,14 +67,14 @@ struct BookmarkListView: View {
                         }
                     } else {
                         List {
-                            ForEach(accountTags, id: \.tag) { item in
+                            ForEach(tags) { tag in
                                 Button {
                                     // TODO: Implement tag filtering
                                 } label: {
                                     HStack {
-                                        Label(item.tag, systemImage: "tag")
+                                        Label(tag.name, systemImage: "tag")
                                         Spacer()
-                                        Text("\(item.count)")
+                                        Text("\(tag.count)")
                                             .foregroundStyle(.secondary)
                                     }
                                 }
@@ -236,7 +237,7 @@ struct BookmarkListView: View {
             Text("Are you sure you want to delete this bookmark? This cannot be undone.")
         }
         .onChange(of: selectedFilter) { _, newFilter in
-            if newFilter == .tags && accountTags.isEmpty {
+            if newFilter == .tags && tags.isEmpty {
                 Task { await fetchTags() }
             }
         }
@@ -249,15 +250,35 @@ struct BookmarkListView: View {
         errorMessage = nil
 
         do {
-            let tags = try await api.fetchAllTags()
+            let apiTags = try await api.fetchAllTags()
             await MainActor.run {
-                accountTags = tags
+                syncTags(apiTags)
                 isLoadingTags = false
             }
         } catch {
             await MainActor.run {
                 errorMessage = error.localizedDescription
                 isLoadingTags = false
+            }
+        }
+    }
+
+    private func syncTags(_ apiTags: [(tag: String, count: Int)]) {
+        let existingNames = Set(tags.map { $0.name })
+        let apiNames = Set(apiTags.map { $0.tag })
+
+        // Delete tags not in API response
+        for tag in tags where !apiNames.contains(tag.name) {
+            modelContext.delete(tag)
+        }
+
+        // Insert or update tags
+        for apiTag in apiTags {
+            if let existing = tags.first(where: { $0.name == apiTag.tag }) {
+                existing.count = apiTag.count
+            } else {
+                let tag = Tag(name: apiTag.tag, count: apiTag.count)
+                modelContext.insert(tag)
             }
         }
     }
