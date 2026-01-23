@@ -115,7 +115,7 @@ struct ShareExtensionView: View {
                 if isFetchingTitle {
                     ProgressView()
                 } else {
-                    TextField("URL", text: $url)
+                    TextField("URL", text: $url, axis: .vertical)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
