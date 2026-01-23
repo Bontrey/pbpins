@@ -8,6 +8,11 @@
 import SwiftUI
 import SwiftData
 
+enum BookmarkFilter: String, CaseIterable {
+    case all = "All"
+    case unread = "Unread"
+}
+
 struct BookmarkListView: View {
     @Environment(AuthManager.self) private var authManager
     @Environment(\.modelContext) private var modelContext
@@ -16,18 +21,28 @@ struct BookmarkListView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingSettings = false
+    @State private var selectedFilter: BookmarkFilter = .all
+
+    private var filteredBookmarks: [Bookmark] {
+        switch selectedFilter {
+        case .all:
+            return bookmarks
+        case .unread:
+            return bookmarks.filter { $0.isUnread }
+        }
+    }
 
     var body: some View {
         NavigationSplitView {
             Group {
-                if bookmarks.isEmpty && !isLoading {
+                if filteredBookmarks.isEmpty && !isLoading {
                     ContentUnavailableView {
-                        Label("No Bookmarks", systemImage: "bookmark")
+                        Label(selectedFilter == .unread ? "No Unread Bookmarks" : "No Bookmarks", systemImage: "bookmark")
                     } description: {
-                        Text("Pull to refresh to load your bookmarks.")
+                        Text(selectedFilter == .unread ? "You've read all your bookmarks." : "Pull to refresh to load your bookmarks.")
                     }
                 } else {
-                    List(bookmarks) { bookmark in
+                    List(filteredBookmarks) { bookmark in
                         NavigationLink {
                             BookmarkDetailView(bookmark: bookmark)
                         } label: {
@@ -35,6 +50,17 @@ struct BookmarkListView: View {
                         }
                     }
                 }
+            }
+            .safeAreaInset(edge: .top) {
+                Picker("Filter", selection: $selectedFilter) {
+                    ForEach(BookmarkFilter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.bar)
             }
             .navigationTitle("Bookmarks")
             .toolbar {
