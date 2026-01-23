@@ -317,12 +317,19 @@ struct BookmarkDetailView: View {
             }
         }
         .onAppear {
-            title = bookmark.title
-            url = bookmark.url
-            tagsText = bookmark.tags.joined(separator: " ")
-            isUnread = bookmark.isUnread
-            isPrivate = bookmark.isPrivate
+            loadBookmarkData()
         }
+        .onChange(of: bookmark.id) {
+            loadBookmarkData()
+        }
+    }
+
+    private func loadBookmarkData() {
+        title = bookmark.title
+        url = bookmark.url
+        tagsText = bookmark.tags.joined(separator: " ")
+        isUnread = bookmark.isUnread
+        isPrivate = bookmark.isPrivate
     }
 
     private func saveChanges() async {
