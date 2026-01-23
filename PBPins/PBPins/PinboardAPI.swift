@@ -201,4 +201,39 @@ class PinboardAPI {
             throw PinboardError.decodingError(error)
         }
     }
+
+    func fetchAllTags() async throws -> [(tag: String, count: Int)] {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/tags/get") else {
+            throw PinboardError.invalidURL
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "auth_token", value: apiToken),
+            URLQueryItem(name: "format", value: "json")
+        ]
+
+        guard let url = urlComponents.url else {
+            throw PinboardError.invalidURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PinboardError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw PinboardError.httpError(httpResponse.statusCode)
+        }
+
+        do {
+            // Response is a dictionary: {"tagname": count, ...} where count is an integer
+            let tagsDict = try JSONDecoder().decode([String: Int].self, from: data)
+            return tagsDict
+                .map { (tag: $0.key, count: $0.value) }
+                .sorted { $0.count > $1.count }
+        } catch {
+            throw PinboardError.decodingError(error)
+        }
+    }
 }

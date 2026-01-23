@@ -12,6 +12,7 @@ import SafariServices
 enum BookmarkFilter: String, CaseIterable {
     case all = "All"
     case unread = "Unread"
+    case tags = "Tags"
 }
 
 struct BookmarkListView: View {
@@ -30,6 +31,8 @@ struct BookmarkListView: View {
     @State private var currentOffset = 0
     @State private var hasMorePages = true
     @State private var selectedBookmarkID: String?
+    @State private var accountTags: [(tag: String, count: Int)] = []
+    @State private var isLoadingTags = false
 
     private let pageSize = 100
 
@@ -39,6 +42,8 @@ struct BookmarkListView: View {
             return bookmarks
         case .unread:
             return bookmarks.filter { $0.isUnread }
+        case .tags:
+            return bookmarks
         }
     }
 
@@ -50,7 +55,33 @@ struct BookmarkListView: View {
     var body: some View {
         NavigationSplitView {
             Group {
-                if filteredBookmarks.isEmpty && !isLoading {
+                if selectedFilter == .tags {
+                    if isLoadingTags {
+                        ProgressView("Loading tags...")
+                    } else if accountTags.isEmpty {
+                        ContentUnavailableView {
+                            Label("No Tags", systemImage: "tag")
+                        } description: {
+                            Text("Your bookmarks don't have any tags yet.")
+                        }
+                    } else {
+                        List {
+                            ForEach(accountTags, id: \.tag) { item in
+                                Button {
+                                    // TODO: Implement tag filtering
+                                } label: {
+                                    HStack {
+                                        Label(item.tag, systemImage: "tag")
+                                        Spacer()
+                                        Text("\(item.count)")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .foregroundStyle(.primary)
+                            }
+                        }
+                    }
+                } else if filteredBookmarks.isEmpty && !isLoading {
                     ContentUnavailableView {
                         Label(selectedFilter == .unread ? "No Unread Bookmarks" : "No Bookmarks", systemImage: "bookmark")
                     } description: {
@@ -203,6 +234,31 @@ struct BookmarkListView: View {
             }
         } message: {
             Text("Are you sure you want to delete this bookmark? This cannot be undone.")
+        }
+        .onChange(of: selectedFilter) { _, newFilter in
+            if newFilter == .tags && accountTags.isEmpty {
+                Task { await fetchTags() }
+            }
+        }
+    }
+
+    private func fetchTags() async {
+        guard let api = authManager.createAPI() else { return }
+
+        isLoadingTags = true
+        errorMessage = nil
+
+        do {
+            let tags = try await api.fetchAllTags()
+            await MainActor.run {
+                accountTags = tags
+                isLoadingTags = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isLoadingTags = false
+            }
         }
     }
 
