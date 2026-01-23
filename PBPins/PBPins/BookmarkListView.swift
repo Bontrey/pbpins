@@ -501,7 +501,7 @@ struct BookmarkRowView: View {
                     .lineLimit(1)
 
                 if !bookmark.tags.isEmpty {
-                    Text(bookmark.tags.joined(separator: ", "))
+                    Text(bookmark.tags.joined(separator: " "))
                         .font(.caption2)
                         .foregroundStyle(.blue)
                         .lineLimit(1)

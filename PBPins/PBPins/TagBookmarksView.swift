@@ -193,7 +193,7 @@ struct TagBookmarkRowView: View {
                     .lineLimit(1)
 
                 if !tags.isEmpty {
-                    Text(tags.joined(separator: ", "))
+                    Text(tags.joined(separator: " "))
                         .font(.caption2)
                         .foregroundStyle(.blue)
                         .lineLimit(1)
