@@ -357,6 +357,37 @@ struct SafariPreview: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
+struct SafariWebView: UIViewControllerRepresentable {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(dismiss: dismiss)
+    }
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let config = SFSafariViewController.Configuration()
+        config.entersReaderIfAvailable = false
+        let safari = SFSafariViewController(url: url, configuration: config)
+        safari.delegate = context.coordinator
+        return safari
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+
+    class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        let dismiss: DismissAction
+
+        init(dismiss: DismissAction) {
+            self.dismiss = dismiss
+        }
+
+        func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+            dismiss()
+        }
+    }
+}
+
 struct BookmarkRowView: View {
     let bookmark: Bookmark
 
@@ -423,17 +454,20 @@ struct BookmarkDetailView: View {
             }
 
             Section("URL") {
-                HStack {
+                if let validURL = URL(string: url) {
+                    NavigationLink {
+                        SafariWebView(url: validURL)
+                            .ignoresSafeArea()
+                            .toolbar(.hidden, for: .navigationBar)
+                    } label: {
+                        TextField("URL", text: $url)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                    }
+                } else {
                     TextField("URL", text: $url)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
-
-                    if let validURL = URL(string: url) {
-                        Link(destination: validURL) {
-                            Image(systemName: "safari")
-                                .foregroundStyle(.blue)
-                        }
-                    }
                 }
             }
 
