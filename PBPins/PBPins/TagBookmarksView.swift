@@ -99,6 +99,7 @@ struct TagBookmarksView: View {
         .refreshable {
             await refreshBookmarks()
         }
+        .contentMargins(.top, 0, for: .scrollContent)
         .task(id: tag.name) {
             await refreshBookmarks()
         }
