@@ -340,7 +340,7 @@ struct TagBookmarkDetailView: View {
                                 .controlSize(.small)
                             Text("Fetching title...")
                         } else {
-                            Text("Fetch title from URL")
+                            Text("Fetch Title from URL")
                         }
                     }
                 }
