@@ -111,21 +111,24 @@ struct ShareExtensionView: View {
 
     private var formView: some View {
         Form {
-            Section {
+            Section("URL") {
                 if isFetchingTitle {
-                    HStack {
-                        Text("URL")
-                        Spacer()
-                        ProgressView()
-                    }
+                    ProgressView()
                 } else {
-                    LabeledContent("URL") {
-                        Text(url)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
+                    TextField("URL", text: $url)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
                 }
 
+                if !isFetchingTitle && urlHasTrackingParameters {
+                    Button("Remove Tracking Parameters") {
+                        url = removeTrackingParameters(from: url)
+                    }
+                }
+            }
+
+            Section("Title") {
                 TextField("Title", text: $title)
             }
 
@@ -265,6 +268,68 @@ struct ShareExtensionView: View {
         }
 
         return nil
+    }
+
+    private static let trackingParameters: Set<String> = [
+        // Google Analytics / Ads
+        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+        "utm_id", "utm_source_platform", "utm_creative_format", "utm_marketing_tactic",
+        "gclid", "gclsrc", "dclid", "gad_source",
+        // Facebook
+        "fbclid", "fb_action_ids", "fb_action_types", "fb_source", "fb_ref",
+        // Twitter/X
+        "twclid",
+        // Microsoft/Bing
+        "msclkid",
+        // TikTok
+        "ttclid",
+        // Mailchimp
+        "mc_cid", "mc_eid",
+        // HubSpot
+        "hsa_acc", "hsa_cam", "hsa_grp", "hsa_ad", "hsa_src", "hsa_tgt",
+        "hsa_kw", "hsa_mt", "hsa_net", "hsa_ver",
+        // Marketo
+        "mkt_tok",
+        // Adobe
+        "s_kwcid", "ef_id",
+        // Other common trackers
+        "ref", "ref_src", "ref_url", "source", "campaign",
+        "igshid", // Instagram
+        "si", // Spotify
+        "at_medium", "at_campaign", // AT Internet
+        "oly_enc_id", "oly_anon_id", // Omeda
+        "vero_id", "vero_conv",
+        "wickedid",
+        "yclid", // Yandex
+        "_hsenc", "_hsmi", // HubSpot
+        "trk", "trkInfo", // LinkedIn
+        "cvid", "oicd", // Microsoft
+        "ncid", "sr_share", // Various news sites
+    ]
+
+    private var urlHasTrackingParameters: Bool {
+        guard let components = URLComponents(string: url),
+              let queryItems = components.queryItems else {
+            return false
+        }
+        return queryItems.contains { item in
+            Self.trackingParameters.contains(item.name.lowercased())
+        }
+    }
+
+    private func removeTrackingParameters(from urlString: String) -> String {
+        guard var components = URLComponents(string: urlString) else {
+            return urlString
+        }
+
+        if let queryItems = components.queryItems {
+            let filteredItems = queryItems.filter { item in
+                !Self.trackingParameters.contains(item.name.lowercased())
+            }
+            components.queryItems = filteredItems.isEmpty ? nil : filteredItems
+        }
+
+        return components.string ?? urlString
     }
 
     private func save() {
