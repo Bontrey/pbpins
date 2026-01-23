@@ -176,6 +176,14 @@ struct BookmarkListView: View {
         dateFormatter.formatOptions = [.withInternetDateTime]
 
         let existingIDs = Set(bookmarks.map { $0.id })
+        let apiIDs = Set(apiBookmarks.map { $0.hash })
+
+        // Delete bookmarks that no longer exist on Pinboard
+        for bookmark in bookmarks {
+            if !apiIDs.contains(bookmark.id) {
+                modelContext.delete(bookmark)
+            }
+        }
 
         for apiBookmark in apiBookmarks {
             let created = dateFormatter.date(from: apiBookmark.time) ?? Date()
