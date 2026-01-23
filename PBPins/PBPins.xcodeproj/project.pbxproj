@@ -35,7 +35,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		96D0ED1F2F2273DD00AE950A /* PBPins.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PBPins.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		96D0ED1F2F2273DD00AE950A /* PB Pins.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "PB Pins.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		96D0ED362F22744E00AE950A /* PBPinsShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PBPinsShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -95,7 +95,7 @@
 		96D0ED202F2273DD00AE950A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				96D0ED1F2F2273DD00AE950A /* PBPins.app */,
+				96D0ED1F2F2273DD00AE950A /* PB Pins.app */,
 				96D0ED362F22744E00AE950A /* PBPinsShareExtension.appex */,
 			);
 			name = Products;
@@ -125,7 +125,7 @@
 			packageProductDependencies = (
 			);
 			productName = PBPins;
-			productReference = 96D0ED1F2F2273DD00AE950A /* PBPins.app */;
+			productReference = 96D0ED1F2F2273DD00AE950A /* PB Pins.app */;
 			productType = "com.apple.product-type.application";
 		};
 		96D0ED352F22744E00AE950A /* PBPinsShareExtension */ = {
@@ -289,6 +289,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -346,6 +347,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
@@ -374,7 +376,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ch.longwei.PBPins;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "PB Pins";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -407,7 +409,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ch.longwei.PBPins;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "PB Pins";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
