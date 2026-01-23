@@ -102,6 +102,38 @@ class PinboardAPI {
         }
     }
 
+    func deleteBookmark(url: String) async throws {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/posts/delete") else {
+            throw PinboardError.invalidURL
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "auth_token", value: apiToken),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "url", value: url)
+        ]
+
+        guard let url = urlComponents.url else {
+            throw PinboardError.invalidURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PinboardError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw PinboardError.httpError(httpResponse.statusCode)
+        }
+
+        // Check for API error in response
+        if let responseString = String(data: data, encoding: .utf8),
+           responseString.contains("\"result_code\":\"done\"") == false {
+            throw PinboardError.invalidResponse
+        }
+    }
+
     func fetchRecentBookmarks(count: Int = 100) async throws -> [APIBookmark] {
         guard var urlComponents = URLComponents(string: "\(baseURL)/posts/recent") else {
             throw PinboardError.invalidURL

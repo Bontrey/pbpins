@@ -23,6 +23,7 @@ struct BookmarkListView: View {
     @State private var showingSettings = false
     @State private var selectedFilter: BookmarkFilter = .all
     @State private var isUpdating = false
+    @State private var bookmarkToDelete: Bookmark?
 
     private var filteredBookmarks: [Bookmark] {
         switch selectedFilter {
@@ -59,6 +60,13 @@ struct BookmarkListView: View {
                                 )
                             }
                             .tint(bookmark.isUnread ? .green : .blue)
+
+                            Button {
+                                bookmarkToDelete = bookmark
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .tint(.red)
                         }
                     }
                     .disabled(isUpdating)
@@ -121,6 +129,21 @@ struct BookmarkListView: View {
                 Text(errorMessage)
             }
         }
+        .confirmationDialog("Delete Bookmark", isPresented: .init(
+            get: { bookmarkToDelete != nil },
+            set: { if !$0 { bookmarkToDelete = nil } }
+        ), titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let bookmark = bookmarkToDelete {
+                    Task { await deleteBookmark(bookmark) }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                bookmarkToDelete = nil
+            }
+        } message: {
+            Text("Are you sure you want to delete this bookmark? This cannot be undone.")
+        }
     }
 
     private func refreshBookmarks() async {
@@ -161,6 +184,25 @@ struct BookmarkListView: View {
             await MainActor.run {
                 bookmark.isUnread = newUnreadStatus
                 bookmark.updated = Date()
+                isUpdating = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isUpdating = false
+            }
+        }
+    }
+
+    private func deleteBookmark(_ bookmark: Bookmark) async {
+        guard let api = authManager.createAPI() else { return }
+
+        isUpdating = true
+
+        do {
+            try await api.deleteBookmark(url: bookmark.url)
+            await MainActor.run {
+                modelContext.delete(bookmark)
                 isUpdating = false
             }
         } catch {
@@ -256,6 +298,8 @@ struct BookmarkRowView: View {
 
 struct BookmarkDetailView: View {
     @Environment(AuthManager.self) private var authManager
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Bindable var bookmark: Bookmark
 
     @State private var title: String = ""
@@ -264,6 +308,8 @@ struct BookmarkDetailView: View {
     @State private var isUnread: Bool = false
     @State private var isPrivate: Bool = false
     @State private var isSaving = false
+    @State private var isDeleting = false
+    @State private var showingDeleteConfirmation = false
     @State private var errorMessage: String?
 
     private var hasChanges: Bool {
@@ -300,6 +346,23 @@ struct BookmarkDetailView: View {
                 LabeledContent("Created", value: bookmark.created, format: .dateTime)
                 LabeledContent("Updated", value: bookmark.updated, format: .dateTime)
             }
+
+            Section {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    HStack {
+                        Spacer()
+                        if isDeleting {
+                            ProgressView()
+                        } else {
+                            Text("Delete Bookmark")
+                        }
+                        Spacer()
+                    }
+                }
+                .disabled(isDeleting)
+            }
         }
         .navigationTitle("Bookmark")
         .toolbar {
@@ -330,6 +393,14 @@ struct BookmarkDetailView: View {
         .onChange(of: bookmark.id) {
             loadBookmarkData()
         }
+        .confirmationDialog("Delete Bookmark", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task { await deleteBookmark() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete this bookmark? This cannot be undone.")
+        }
     }
 
     private func loadBookmarkData() {
@@ -338,6 +409,26 @@ struct BookmarkDetailView: View {
         tagsText = bookmark.tags.joined(separator: " ")
         isUnread = bookmark.isUnread
         isPrivate = bookmark.isPrivate
+    }
+
+    private func deleteBookmark() async {
+        guard let api = authManager.createAPI() else { return }
+
+        isDeleting = true
+
+        do {
+            try await api.deleteBookmark(url: bookmark.url)
+            await MainActor.run {
+                modelContext.delete(bookmark)
+                isDeleting = false
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isDeleting = false
+            }
+        }
     }
 
     private func saveChanges() async {
