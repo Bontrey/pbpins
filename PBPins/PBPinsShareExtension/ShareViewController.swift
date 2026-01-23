@@ -130,7 +130,7 @@ struct ShareExtensionView: View {
             }
 
             Section {
-                TextField("Tags (space-separated)", text: $tags)
+                TextField("Tags", text: $tags)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             } footer: {

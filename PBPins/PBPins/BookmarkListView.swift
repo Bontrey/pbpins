@@ -561,7 +561,7 @@ struct BookmarkDetailView: View {
             }
 
             Section("Tags") {
-                TextField("Tags (space-separated)", text: $tagsText)
+                TextField("Tags", text: $tagsText)
                     .textInputAutocapitalization(.never)
             }
 
