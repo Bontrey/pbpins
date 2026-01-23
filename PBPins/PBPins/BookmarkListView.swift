@@ -29,6 +29,7 @@ struct BookmarkListView: View {
     @State private var bookmarkToDelete: Bookmark?
     @State private var currentOffset = 0
     @State private var hasMorePages = true
+    @State private var selectedBookmarkID: String?
 
     private let pageSize = 100
 
@@ -41,6 +42,11 @@ struct BookmarkListView: View {
         }
     }
 
+    private var selectedBookmark: Bookmark? {
+        guard let id = selectedBookmarkID else { return nil }
+        return bookmarks.first { $0.id == id }
+    }
+
     var body: some View {
         NavigationSplitView {
             Group {
@@ -51,11 +57,9 @@ struct BookmarkListView: View {
                         Text(selectedFilter == .unread ? "You've read all your bookmarks." : "Pull to refresh to load your bookmarks.")
                     }
                 } else {
-                    List {
+                    List(selection: $selectedBookmarkID) {
                         ForEach(filteredBookmarks) { bookmark in
-                            NavigationLink {
-                                BookmarkDetailView(bookmark: bookmark)
-                            } label: {
+                            NavigationLink(value: bookmark.id) {
                                 BookmarkRowView(bookmark: bookmark)
                             }
                             .contextMenu {
@@ -163,8 +167,14 @@ struct BookmarkListView: View {
                 }
             }
         } detail: {
-            Text("Select a bookmark")
-                .foregroundStyle(.secondary)
+            if let bookmark = selectedBookmark {
+                NavigationStack {
+                    BookmarkDetailView(bookmark: bookmark)
+                }
+            } else {
+                Text("Select a bookmark")
+                    .foregroundStyle(.secondary)
+            }
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
