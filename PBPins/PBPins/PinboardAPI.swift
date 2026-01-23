@@ -166,4 +166,39 @@ class PinboardAPI {
             throw PinboardError.decodingError(error)
         }
     }
+
+    func fetchAllBookmarks(start: Int = 0, results: Int = 100) async throws -> [APIBookmark] {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/posts/all") else {
+            throw PinboardError.invalidURL
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "auth_token", value: apiToken),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "start", value: String(start)),
+            URLQueryItem(name: "results", value: String(results))
+        ]
+
+        guard let url = urlComponents.url else {
+            throw PinboardError.invalidURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PinboardError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw PinboardError.httpError(httpResponse.statusCode)
+        }
+
+        do {
+            // posts/all returns an array directly, not wrapped in PostsResponse
+            let bookmarks = try JSONDecoder().decode([APIBookmark].self, from: data)
+            return bookmarks
+        } catch {
+            throw PinboardError.decodingError(error)
+        }
+    }
 }

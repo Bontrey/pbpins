@@ -20,11 +20,16 @@ struct BookmarkListView: View {
     @Query(sort: \Bookmark.created, order: .reverse) private var bookmarks: [Bookmark]
 
     @State private var isLoading = false
+    @State private var isLoadingMore = false
     @State private var errorMessage: String?
     @State private var showingSettings = false
     @State private var selectedFilter: BookmarkFilter = .all
     @State private var isUpdating = false
     @State private var bookmarkToDelete: Bookmark?
+    @State private var currentOffset = 0
+    @State private var hasMorePages = true
+
+    private let pageSize = 100
 
     private var filteredBookmarks: [Bookmark] {
         switch selectedFilter {
@@ -45,48 +50,62 @@ struct BookmarkListView: View {
                         Text(selectedFilter == .unread ? "You've read all your bookmarks." : "Pull to refresh to load your bookmarks.")
                     }
                 } else {
-                    List(filteredBookmarks) { bookmark in
-                        NavigationLink {
-                            BookmarkDetailView(bookmark: bookmark)
-                        } label: {
-                            BookmarkRowView(bookmark: bookmark)
-                        }
-                        .contextMenu {
-                            if let url = URL(string: bookmark.url) {
-                                Link(destination: url) {
-                                    Label("Open in Safari", systemImage: "safari")
+                    List {
+                        ForEach(filteredBookmarks) { bookmark in
+                            NavigationLink {
+                                BookmarkDetailView(bookmark: bookmark)
+                            } label: {
+                                BookmarkRowView(bookmark: bookmark)
+                            }
+                            .contextMenu {
+                                if let url = URL(string: bookmark.url) {
+                                    Link(destination: url) {
+                                        Label("Open in Safari", systemImage: "safari")
+                                    }
+                                }
+                                Button {
+                                    Task { await toggleReadStatus(bookmark) }
+                                } label: {
+                                    Label(
+                                        bookmark.isUnread ? "Mark as Read" : "Mark as Unread",
+                                        systemImage: bookmark.isUnread ? "checkmark.circle" : "circle"
+                                    )
+                                }
+                            } preview: {
+                                if let url = URL(string: bookmark.url) {
+                                    SafariPreview(url: url)
                                 }
                             }
-                            Button {
-                                Task { await toggleReadStatus(bookmark) }
-                            } label: {
-                                Label(
-                                    bookmark.isUnread ? "Mark as Read" : "Mark as Unread",
-                                    systemImage: bookmark.isUnread ? "checkmark.circle" : "circle"
-                                )
-                            }
-                        } preview: {
-                            if let url = URL(string: bookmark.url) {
-                                SafariPreview(url: url)
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    Task { await toggleReadStatus(bookmark) }
+                                } label: {
+                                    Label(
+                                        bookmark.isUnread ? "Mark Read" : "Mark Unread",
+                                        systemImage: bookmark.isUnread ? "checkmark.circle" : "circle"
+                                    )
+                                }
+                                .tint(bookmark.isUnread ? .green : .blue)
+
+                                Button {
+                                    bookmarkToDelete = bookmark
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(.red)
                             }
                         }
-                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                Task { await toggleReadStatus(bookmark) }
-                            } label: {
-                                Label(
-                                    bookmark.isUnread ? "Mark Read" : "Mark Unread",
-                                    systemImage: bookmark.isUnread ? "checkmark.circle" : "circle"
-                                )
-                            }
-                            .tint(bookmark.isUnread ? .green : .blue)
 
-                            Button {
-                                bookmarkToDelete = bookmark
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                        if hasMorePages {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding(.vertical, 8)
+                                Spacer()
                             }
-                            .tint(.red)
+                            .onAppear {
+                                Task { await loadMoreBookmarks() }
+                            }
                         }
                     }
                     .disabled(isUpdating)
@@ -171,17 +190,42 @@ struct BookmarkListView: View {
 
         isLoading = true
         errorMessage = nil
+        currentOffset = 0
 
         do {
-            let apiBookmarks = try await api.fetchRecentBookmarks(count: 100)
+            let apiBookmarks = try await api.fetchAllBookmarks(start: 0, results: pageSize)
             await MainActor.run {
-                syncBookmarks(apiBookmarks)
+                syncBookmarks(apiBookmarks, isFullRefresh: true)
+                hasMorePages = apiBookmarks.count == pageSize
+                currentOffset = apiBookmarks.count
                 isLoading = false
             }
         } catch {
             await MainActor.run {
                 errorMessage = error.localizedDescription
                 isLoading = false
+            }
+        }
+    }
+
+    private func loadMoreBookmarks() async {
+        guard !isLoadingMore, let api = authManager.createAPI() else { return }
+
+        isLoadingMore = true
+        errorMessage = nil
+
+        do {
+            let apiBookmarks = try await api.fetchAllBookmarks(start: currentOffset, results: pageSize)
+            await MainActor.run {
+                syncBookmarks(apiBookmarks, isFullRefresh: false)
+                hasMorePages = apiBookmarks.count == pageSize
+                currentOffset += apiBookmarks.count
+                isLoadingMore = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isLoadingMore = false
             }
         }
     }
@@ -233,17 +277,25 @@ struct BookmarkListView: View {
         }
     }
 
-    private func syncBookmarks(_ apiBookmarks: [APIBookmark]) {
+    private func syncBookmarks(_ apiBookmarks: [APIBookmark], isFullRefresh: Bool) {
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime]
 
         let existingIDs = Set(bookmarks.map { $0.id })
         let apiIDs = Set(apiBookmarks.map { $0.hash })
 
-        // Delete bookmarks that no longer exist on Pinboard
-        for bookmark in bookmarks {
-            if !apiIDs.contains(bookmark.id) {
-                modelContext.delete(bookmark)
+        // Parse dates from API bookmarks to find the date range
+        let apiDates = apiBookmarks.compactMap { dateFormatter.date(from: $0.time) }
+        let oldestDate = apiDates.min()
+        let newestDate = apiDates.max()
+
+        // Delete local bookmarks that fall within the fetched date range but aren't in API response
+        if let oldest = oldestDate, let newest = newestDate {
+            for bookmark in bookmarks {
+                let isInDateRange = bookmark.created >= oldest && bookmark.created <= newest
+                if isInDateRange && !apiIDs.contains(bookmark.id) {
+                    modelContext.delete(bookmark)
+                }
             }
         }
 
