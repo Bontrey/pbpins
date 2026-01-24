@@ -46,6 +46,7 @@ struct ShareExtensionView: View {
     @State private var isSaving: Bool = false
     @State private var errorMessage: String?
     @State private var showError: Bool = false
+    @State private var previouslySavedDate: Date?
 
     private let apiTokenKey = "pinboard_api_token"
 
@@ -111,7 +112,7 @@ struct ShareExtensionView: View {
 
     private var formView: some View {
         Form {
-            Section("URL") {
+            Section {
                 if isFetchingTitle {
                     ProgressView()
                 } else {
@@ -121,10 +122,17 @@ struct ShareExtensionView: View {
                         .keyboardType(.URL)
                 }
 
-                if !isFetchingTitle && urlHasTrackingParameters {
+                if !isFetchingTitle {
                     Button("Remove Tracking Parameters") {
                         url = removeTrackingParameters(from: url)
                     }
+                }
+            } header: {
+                Text("URL")
+            } footer: {
+                if let savedDate = previouslySavedDate {
+                    Text("Previously saved on \(savedDate.formatted(date: .abbreviated, time: .shortened))")
+                        .foregroundStyle(.orange)
                 }
             }
 
@@ -177,6 +185,7 @@ struct ShareExtensionView: View {
                                 self.title = sharedURL.host ?? sharedURL.absoluteString
                             }
                             await fetchTitle(from: sharedURL)
+                            await checkIfPreviouslySaved()
                             return
                         }
                     } catch {
@@ -196,6 +205,7 @@ struct ShareExtensionView: View {
                                 self.title = sharedURL.host ?? sharedURL.absoluteString
                             }
                             await fetchTitle(from: sharedURL)
+                            await checkIfPreviouslySaved()
                             return
                         }
                     } catch {
@@ -332,6 +342,25 @@ struct ShareExtensionView: View {
         return components.string ?? urlString
     }
 
+    private func checkIfPreviouslySaved() async {
+        guard isLoggedIn, !url.isEmpty else { return }
+
+        // Check using the URL with tracking parameters removed
+        let cleanURL = removeTrackingParameters(from: url)
+
+        do {
+            let api = SharePinboardAPI(apiToken: apiToken)
+            if let savedDate = try await api.checkBookmark(url: cleanURL) {
+                await MainActor.run {
+                    previouslySavedDate = savedDate
+                }
+            }
+        } catch {
+            // Silently fail - not critical if we can't check
+            print("Error checking previous save: \(error)")
+        }
+    }
+
     private func save() {
         guard !url.isEmpty, !title.isEmpty else { return }
 
@@ -380,6 +409,41 @@ class SharePinboardAPI {
 
     init(apiToken: String) {
         self.apiToken = apiToken
+    }
+
+    /// Checks if a URL was previously saved. Returns the save date if found, nil otherwise.
+    func checkBookmark(url: String) async throws -> Date? {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/posts/get") else {
+            throw ShareError.invalidURL
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "auth_token", value: apiToken),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "url", value: url)
+        ]
+
+        guard let requestURL = urlComponents.url else {
+            throw ShareError.invalidURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: requestURL)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ShareError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw ShareError.httpError(httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let postsResponse = try decoder.decode(PostsGetResponse.self, from: data)
+
+        // Return the date of the first (and should be only) matching post
+        return postsResponse.posts.first?.time
     }
 
     func addBookmark(
@@ -440,4 +504,13 @@ enum ShareError: Error, LocalizedError {
             return "Server error: \(code)"
         }
     }
+}
+
+// Response structs for /posts/get endpoint
+struct PostsGetResponse: Decodable {
+    let posts: [PostsGetBookmark]
+}
+
+struct PostsGetBookmark: Decodable {
+    let time: Date
 }
