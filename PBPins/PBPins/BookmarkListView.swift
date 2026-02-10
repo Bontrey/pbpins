@@ -533,6 +533,7 @@ struct BookmarkDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var errorMessage: String?
     @State private var isFetchingTitle = false
+    @State private var showingArchive = false
 
     private var hasChanges: Bool {
         title != bookmark.title ||
@@ -569,9 +570,19 @@ struct BookmarkDetailView: View {
                             .ignoresSafeArea()
                             .toolbar(.hidden, for: .navigationBar)
                     } label: {
-                        TextField("URL", text: $url)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.URL)
+                        HStack {
+                            Text(url)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button {
+                                showingArchive = true
+                            } label: {
+                                Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     TextField("URL", text: $url)
@@ -613,6 +624,13 @@ struct BookmarkDetailView: View {
             }
         }
         .navigationTitle("Bookmark")
+        .navigationDestination(isPresented: $showingArchive) {
+            if let archiveURL = URL(string: "https://archive.is/\(url)") {
+                SafariWebView(url: archiveURL)
+                    .ignoresSafeArea()
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if isSaving {
