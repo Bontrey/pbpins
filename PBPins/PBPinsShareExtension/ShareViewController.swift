@@ -232,7 +232,14 @@ struct ShareExtensionView: View {
             request.timeoutInterval = 10
             request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
 
-            let (data, _) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            // Update URL to the final destination after following all redirects
+            if let finalURL = response.url {
+                await MainActor.run {
+                    self.url = finalURL.absoluteString
+                }
+            }
 
             if let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1),
                let extractedTitle = extractTitleFromHTML(html) {
