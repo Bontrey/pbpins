@@ -324,6 +324,7 @@ struct TagBookmarkDetailView: View {
     @State private var errorMessage: String?
     @State private var isFetchingTitle = false
     @State private var showingArchive = false
+    @State private var showingSafari = false
 
     private var hasChanges: Bool {
         title != bookmark.description ||
@@ -354,30 +355,26 @@ struct TagBookmarkDetailView: View {
             }
 
             Section("URL") {
-                if let validURL = URL(string: url) {
-                    NavigationLink {
-                        SafariWebView(url: validURL)
-                            .ignoresSafeArea()
-                            .toolbar(.hidden, for: .navigationBar)
-                    } label: {
-                        HStack {
-                            Text(url)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                            Button {
-                                showingArchive = true
-                            } label: {
-                                Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                            }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                } else {
+                HStack {
                     TextField("URL", text: $url)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
+                    if URL(string: url) != nil {
+                        Button {
+                            showingArchive = true
+                        } label: {
+                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        Button {
+                            showingSafari = true
+                        } label: {
+                            Image(systemName: "chevron.right")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -413,6 +410,13 @@ struct TagBookmarkDetailView: View {
         .navigationDestination(isPresented: $showingArchive) {
             if let archiveURL = URL(string: "https://archive.is/\(url)") {
                 SafariWebView(url: archiveURL)
+                    .ignoresSafeArea()
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+        }
+        .navigationDestination(isPresented: $showingSafari) {
+            if let validURL = URL(string: url) {
+                SafariWebView(url: validURL)
                     .ignoresSafeArea()
                     .toolbar(.hidden, for: .navigationBar)
             }
