@@ -371,6 +371,9 @@ struct BookmarkListView: View {
         do {
             try await api.deleteBookmark(url: bookmark.url)
             await MainActor.run {
+                if selectedBookmarkID == bookmark.id {
+                    selectedBookmarkID = nil
+                }
                 modelContext.delete(bookmark)
                 isUpdating = false
             }
@@ -662,6 +665,9 @@ struct BookmarkDetailView: View {
         }
         .onChange(of: bookmark.id) {
             loadBookmarkData()
+        }
+        .onChange(of: bookmark.isUnread) {
+            isUnread = bookmark.isUnread
         }
         .confirmationDialog("Delete Bookmark", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
