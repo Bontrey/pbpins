@@ -42,6 +42,11 @@ struct TagBookmarksView: View {
                         }
                     }
                     Button {
+                        UIPasteboard.general.string = bookmark.href
+                    } label: {
+                        Label("Copy URL", systemImage: "doc.on.doc")
+                    }
+                    Button {
                         Task { await toggleReadStatus(bookmark) }
                     } label: {
                         Label(
